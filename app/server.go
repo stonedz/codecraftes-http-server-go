@@ -36,10 +36,13 @@ func main() {
 
 	words := strings.Split(lines[0], " ")
 	target := words[1]
+	parts := strings.Split(target, "/")
 
 	response := []byte{}
 	if target == "/" {
 		response = ([]byte("HTTP/1.1 200 OK\r\n\r\n"))
+	} else if len(parts) > 2 && parts[1] == "echo" {
+		response = ([]byte("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: " + fmt.Sprint(len(parts[2])) + "\r\n\r\n" + parts[2]))
 	} else {
 		response = ([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
 	}
