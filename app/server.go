@@ -36,13 +36,16 @@ func main() {
 
 	words := strings.Split(lines[0], " ")
 	target := words[1]
-	parts := strings.Split(target, "/")
+	req_parts := strings.Split(target, "/")
+	user_agent := getHeader(lines, "User-Agent")
 
 	response := []byte{}
 	if target == "/" {
 		response = ([]byte("HTTP/1.1 200 OK\r\n\r\n"))
-	} else if len(parts) > 2 && parts[1] == "echo" {
-		response = ([]byte("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: " + fmt.Sprint(len(parts[2])) + "\r\n\r\n" + parts[2]))
+	} else if req_parts[1] == "user-agent" {
+		response = ([]byte("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: " + fmt.Sprint(len(user_agent)) + "\r\n\r\n" + user_agent))
+	} else if len(req_parts) > 2 && req_parts[1] == "echo" {
+		response = ([]byte("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: " + fmt.Sprint(len(req_parts[2])) + "\r\n\r\n" + req_parts[2]))
 	} else {
 		response = ([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
 	}
@@ -55,4 +58,14 @@ func main() {
 
 	conn.Close()
 
+}
+
+func getHeader(lines []string, name string) string {
+	for _, line := range lines {
+		parts := strings.Split(line, ": ")
+		if parts[0] == name {
+			return parts[1]
+		}
+	}
+	return ""
 }
