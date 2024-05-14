@@ -37,11 +37,19 @@ func main() {
 	words := strings.Split(lines[0], " ")
 	target := words[1]
 
+	response := []byte{}
 	if target == "/" {
-		conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
+		response = ([]byte("HTTP/1.1 200 OK\r\n\r\n"))
 	} else {
-		conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
+		response = ([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
 	}
+
+	_, err = conn.Write(response)
+	if err != nil {
+		fmt.Println("Error writing response: ", err.Error())
+		os.Exit(1)
+	}
+
 	conn.Close()
 
 }
