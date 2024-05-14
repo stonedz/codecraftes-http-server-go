@@ -26,7 +26,7 @@ func main() {
 	buff := make([]byte, 1024)
 	n, err := conn.Read(buff)
 	if err != nil {
-		fmt.Println("Error accepting connection: ", err.Error())
+		fmt.Println("Error reading request: ", err.Error())
 		os.Exit(1)
 	}
 
@@ -42,6 +42,6 @@ func main() {
 	} else {
 		conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
 	}
-	// conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
+	conn.Close()
 
 }
