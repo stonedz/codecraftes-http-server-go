@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"net"
 	"os"
@@ -10,6 +11,10 @@ import (
 func main() {
 	// You can use print statements as follows for debugging, they'll be visible when running tests.
 	fmt.Println("Logs from your program will appear here!")
+
+	// Parse command line arguments
+	directory := flag.String("directory", ".", "Directory to serve files from")
+	flag.Parse()
 
 	l, err := net.Listen("tcp", "0.0.0.0:4221")
 	if err != nil {
@@ -24,12 +29,12 @@ func main() {
 			os.Exit(1)
 		}
 
-		go handleConnection(conn)
+		go handleConnection(conn, directory)
 	}
 
 }
 
-func handleConnection(conn net.Conn) {
+func handleConnection(conn net.Conn, directory *string) {
 	defer conn.Close()
 	fmt.Println("Handling connection...")
 
@@ -56,6 +61,9 @@ func handleConnection(conn net.Conn) {
 		response = ([]byte("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: " + fmt.Sprint(len(user_agent)) + "\r\n\r\n" + user_agent))
 	} else if len(req_parts) > 2 && req_parts[1] == "echo" {
 		response = ([]byte("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: " + fmt.Sprint(len(req_parts[2])) + "\r\n\r\n" + req_parts[2]))
+	} else if len(req_parts) > 2 && req_parts[1] == "files" && checkFileExists(*directory+req_parts[2]) {
+		file_contents := getFileContents(*directory + req_parts[2])
+		response = ([]byte("HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: " + fmt.Sprint(len(file_contents)) + "\r\n\r\n" + file_contents))
 	} else {
 		response = ([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
 	}
@@ -76,4 +84,21 @@ func getHeader(lines []string, name string) string {
 		}
 	}
 	return ""
+}
+
+func checkFileExists(filename string) bool {
+	_, err := os.Stat(filename)
+	if os.IsNotExist(err) {
+		return false
+	}
+	return true
+}
+
+func getFileContents(filename string) string {
+	data, err := os.ReadFile(filename)
+	if err != nil {
+		fmt.Println("Error reading file: ", err.Error())
+		os.Exit(1)
+	}
+	return string(data)
 }
