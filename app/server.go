@@ -50,11 +50,30 @@ func handleConnection(conn net.Conn, directory *string) {
 	lines := strings.Split(data, "\r\n")
 
 	words := strings.Split(lines[0], " ")
+	verb := words[0]
 	target := words[1]
 	req_parts := strings.Split(target, "/")
 	user_agent := getHeader(lines, "User-Agent")
+	body := lines[len(lines)-1]
 
 	response := []byte{}
+	switch verb {
+	case "GET":
+		response = handleGetRequest(req_parts, user_agent, directory, target)
+	case "POST":
+		response = handlePostRequest(req_parts, user_agent, directory, target, body)
+	}
+
+	_, err = conn.Write(response)
+	if err != nil {
+		fmt.Println("Error writing response: ", err.Error())
+		os.Exit(1)
+	}
+
+}
+
+func handleGetRequest(req_parts []string, user_agent string, directory *string, target string) []byte {
+	var response []byte
 	if target == "/" {
 		response = ([]byte("HTTP/1.1 200 OK\r\n\r\n"))
 	} else if req_parts[1] == "user-agent" {
@@ -67,13 +86,18 @@ func handleConnection(conn net.Conn, directory *string) {
 	} else {
 		response = ([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
 	}
+	return response
 
-	_, err = conn.Write(response)
-	if err != nil {
-		fmt.Println("Error writing response: ", err.Error())
-		os.Exit(1)
+}
+
+func handlePostRequest(req_parts []string, user_agent string, directory *string, target string, body string) []byte {
+	var response []byte
+	if len(req_parts) > 2 && req_parts[1] == "files" {
+		file_name := req_parts[2]
+		os.WriteFile(*directory+file_name, []byte(body), 0644)
+		response = ([]byte("HTTP/1.1 201 Created\r\nLocation: /files/" + file_name + "\r\n\r\n"))
 	}
-
+	return response
 }
 
 func getHeader(lines []string, name string) string {
