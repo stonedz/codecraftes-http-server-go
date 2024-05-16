@@ -94,8 +94,13 @@ func handlePostRequest(req_parts []string, directory *string, body string) []byt
 	var response []byte
 	if len(req_parts) > 2 && req_parts[1] == "files" {
 		file_name := req_parts[2]
-		os.WriteFile(*directory+file_name, []byte(body), 0644)
-		response = ([]byte("HTTP/1.1 201 Created\r\nLocation: /files/" + file_name + "\r\n\r\n"))
+		err := os.WriteFile(*directory+file_name, []byte(body), 0644)
+		if err != nil {
+			fmt.Println("Error writing file: ", err.Error())
+			response = ([]byte("HTTP/1.1 500 Internal Server Error\r\n\r\n"))
+		} else {
+			response = ([]byte("HTTP/1.1 201 Created\r\nLocation: /files/" + file_name + "\r\n\r\n"))
+		}
 	}
 	return response
 }
