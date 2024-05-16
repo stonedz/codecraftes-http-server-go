@@ -1,6 +1,7 @@
 package main
 
 import (
+	"compress/gzip"
 	"flag"
 	"fmt"
 	"net"
@@ -115,10 +116,28 @@ func handleCompressionEncoding(encoding_request []string, response *Response) *R
 	for _, encoding := range encoding_request {
 		if encoding == "gzip" {
 			response.headers["Content-Encoding"] = "gzip"
+			response.body = compress(response.body)
+			response.headers["Content-Length"] = fmt.Sprint(len(response.body))
 		}
 	}
 
 	return response
+}
+
+func compress(data string) string {
+	var b strings.Builder
+	gz := gzip.NewWriter(&b)
+	_, err := gz.Write([]byte(data))
+	if err != nil {
+		fmt.Println("Error compressing data: ", err.Error())
+		os.Exit(1)
+	}
+	err = gz.Close()
+	if err != nil {
+		fmt.Println("Error closing gzip writer: ", err.Error())
+		os.Exit(1)
+	}
+	return b.String()
 }
 
 func handleGetRequest(req_parts []string, user_agent string, directory *string, target string) *Response {
