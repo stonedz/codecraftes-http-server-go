@@ -8,6 +8,13 @@ import (
 	"strings"
 )
 
+// Response struct
+type Response struct {
+	statusCode int
+	headers    map[string]string
+	body       string
+}
+
 func main() {
 	// You can use print statements as follows for debugging, they'll be visible when running tests.
 	fmt.Println("Logs from your program will appear here!")
@@ -34,6 +41,30 @@ func main() {
 
 }
 
+func buildResponse(response *Response) string {
+	statusMessage := getStatusMessage(response.statusCode)
+	headers := ""
+	for key, value := range response.headers {
+		headers += key + ": " + value + "\r\n"
+	}
+	return "HTTP/1.1 " + fmt.Sprint(response.statusCode) + " " + statusMessage + "\r\n" + headers + "\r\n" + response.body
+}
+
+func getStatusMessage(statusCode int) string {
+	switch statusCode {
+	case 200:
+		return "OK"
+	case 201:
+		return "Created"
+	case 404:
+		return "Not Found"
+	case 500:
+		return "Internal Server Error"
+	default:
+		return "Unknown"
+	}
+}
+
 func handleConnection(conn net.Conn, directory *string) {
 	defer conn.Close()
 	fmt.Println("Handling connection...")
@@ -54,9 +85,11 @@ func handleConnection(conn net.Conn, directory *string) {
 	target := words[1]
 	req_parts := strings.Split(target, "/")
 	user_agent := getHeader(lines, "User-Agent")
+	encoding_request := getHeader(lines, "Accept-Encoding")
+	fmt.Println("Accept-Encoding: ", encoding_request)
 	body := lines[len(lines)-1]
 
-	response := []byte{}
+	var response *Response
 	switch verb {
 	case "GET":
 		response = handleGetRequest(req_parts, user_agent, directory, target)
@@ -64,7 +97,9 @@ func handleConnection(conn net.Conn, directory *string) {
 		response = handlePostRequest(req_parts, directory, body)
 	}
 
-	_, err = conn.Write(response)
+	response = handleCompressionencoding(encoding_request, response)
+
+	_, err = conn.Write([]byte(buildResponse(response)))
 	if err != nil {
 		fmt.Println("Error writing response: ", err.Error())
 		os.Exit(1)
@@ -72,37 +107,55 @@ func handleConnection(conn net.Conn, directory *string) {
 
 }
 
-func handleGetRequest(req_parts []string, user_agent string, directory *string, target string) []byte {
-	var response []byte
-	if target == "/" {
-		response = ([]byte("HTTP/1.1 200 OK\r\n\r\n"))
-	} else if req_parts[1] == "user-agent" {
-		response = ([]byte("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: " + fmt.Sprint(len(user_agent)) + "\r\n\r\n" + user_agent))
-	} else if len(req_parts) > 2 && req_parts[1] == "echo" {
-		response = ([]byte("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: " + fmt.Sprint(len(req_parts[2])) + "\r\n\r\n" + req_parts[2]))
-	} else if len(req_parts) > 2 && req_parts[1] == "files" && checkFileExists(*directory+req_parts[2]) {
-		file_contents := getFileContents(*directory + req_parts[2])
-		response = ([]byte("HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: " + fmt.Sprint(len(file_contents)) + "\r\n\r\n" + file_contents))
-	} else {
-		response = ([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
+func handleCompressionencoding(encoding_request string, response *Response) *Response {
+	if encoding_request == "gzip" {
+		response.headers["Content-Encoding"] = "gzip"
+
+		// Compress the body
+		// response.body = compress(response.body)
 	}
 	return response
+}
+
+func handleGetRequest(req_parts []string, user_agent string, directory *string, target string) *Response {
+	var response Response
+	if target == "/" {
+		response.statusCode = 200
+		response.body = ""
+	} else if req_parts[1] == "user-agent" {
+		response.statusCode = 200
+		response.headers = map[string]string{"Content-Type": "text/plain", "Content-Length": fmt.Sprint(len(user_agent))}
+		response.body = user_agent
+	} else if len(req_parts) > 2 && req_parts[1] == "echo" {
+		response.statusCode = 200
+		response.headers = map[string]string{"Content-Type": "text/plain", "Content-Length": fmt.Sprint(len(req_parts[2]))}
+		response.body = req_parts[2]
+	} else if len(req_parts) > 2 && req_parts[1] == "files" && checkFileExists(*directory+req_parts[2]) {
+		file_contents := getFileContents(*directory + req_parts[2])
+		response.statusCode = 200
+		response.headers = map[string]string{"Content-Type": "application/octet-stream", "Content-Length": fmt.Sprint(len(file_contents))}
+		response.body = file_contents
+	} else {
+		response.statusCode = 404
+	}
+	return &response
 
 }
 
-func handlePostRequest(req_parts []string, directory *string, body string) []byte {
-	var response []byte
+func handlePostRequest(req_parts []string, directory *string, body string) *Response {
+	var response Response
 	if len(req_parts) > 2 && req_parts[1] == "files" {
 		file_name := req_parts[2]
 		err := os.WriteFile(*directory+file_name, []byte(body), 0644)
 		if err != nil {
 			fmt.Println("Error writing file: ", err.Error())
-			response = ([]byte("HTTP/1.1 500 Internal Server Error\r\n\r\n"))
+			response.statusCode = 500
 		} else {
-			response = ([]byte("HTTP/1.1 201 Created\r\nLocation: /files/" + file_name + "\r\n\r\n"))
+			response.statusCode = 201
+			response.headers = map[string]string{"Location": "/files/" + file_name}
 		}
 	}
-	return response
+	return &response
 }
 
 func getHeader(lines []string, name string) string {
