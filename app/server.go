@@ -61,7 +61,7 @@ func handleConnection(conn net.Conn, directory *string) {
 	case "GET":
 		response = handleGetRequest(req_parts, user_agent, directory, target)
 	case "POST":
-		response = handlePostRequest(req_parts, user_agent, directory, target, body)
+		response = handlePostRequest(req_parts, directory, body)
 	}
 
 	_, err = conn.Write(response)
@@ -90,7 +90,7 @@ func handleGetRequest(req_parts []string, user_agent string, directory *string, 
 
 }
 
-func handlePostRequest(req_parts []string, user_agent string, directory *string, target string, body string) []byte {
+func handlePostRequest(req_parts []string, directory *string, body string) []byte {
 	var response []byte
 	if len(req_parts) > 2 && req_parts[1] == "files" {
 		file_name := req_parts[2]
