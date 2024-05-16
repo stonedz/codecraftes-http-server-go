@@ -85,8 +85,12 @@ func handleConnection(conn net.Conn, directory *string) {
 	target := words[1]
 	req_parts := strings.Split(target, "/")
 	user_agent := getHeader(lines, "User-Agent")
-	encoding_request := getHeader(lines, "Accept-Encoding")
-	fmt.Println("Accept-Encoding: ", encoding_request)
+
+	encoding_requests := strings.Split(getHeader(lines, "Accept-Encoding"), ",")
+	for i, encoding := range encoding_requests {
+		encoding_requests[i] = strings.TrimSpace(encoding)
+	}
+
 	body := lines[len(lines)-1]
 
 	var response *Response
@@ -97,7 +101,7 @@ func handleConnection(conn net.Conn, directory *string) {
 		response = handlePostRequest(req_parts, directory, body)
 	}
 
-	response = handleCompressionencoding(encoding_request, response)
+	response = handleCompressionEncoding(encoding_requests, response)
 
 	_, err = conn.Write([]byte(buildResponse(response)))
 	if err != nil {
@@ -107,13 +111,13 @@ func handleConnection(conn net.Conn, directory *string) {
 
 }
 
-func handleCompressionencoding(encoding_request string, response *Response) *Response {
-	if encoding_request == "gzip" {
-		response.headers["Content-Encoding"] = "gzip"
-
-		// Compress the body
-		// response.body = compress(response.body)
+func handleCompressionEncoding(encoding_request []string, response *Response) *Response {
+	for _, encoding := range encoding_request {
+		if encoding == "gzip" {
+			response.headers["Content-Encoding"] = "gzip"
+		}
 	}
+
 	return response
 }
 
